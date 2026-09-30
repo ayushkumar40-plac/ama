@@ -18,8 +18,7 @@ service cloud.firestore {
         && request.resource.data.keys().hasAll(['fileHash', 'blockHash', 'txHash']);
       allow read: if request.auth != null
         && (resource.data.ownerUid == request.auth.uid
-          || request.auth.token.email in resource.data.accessList
-          || request.auth.uid in resource.data.accessList);
+          || request.auth.uid in resource.data.get('accessList', []));
       allow delete: if request.auth != null
         && resource.data.ownerUid == request.auth.uid;
       allow update: if false; // append-only: no edits, ever
