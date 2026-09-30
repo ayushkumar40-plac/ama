@@ -50,7 +50,7 @@ export default function Navbar() {
       position: 'sticky',
       top: 0,
       zIndex: 900,
-      background: 'rgba(7, 11, 20, 0.85)',
+      background: 'rgba(17, 24, 32, 0.92)',
       backdropFilter: 'blur(20px)',
       WebkitBackdropFilter: 'blur(20px)',
       borderBottom: '1px solid var(--border-subtle)',
@@ -67,14 +67,14 @@ export default function Navbar() {
         {/* Brand */}
         <Link to="/" style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <div style={{
-            background: 'linear-gradient(135deg, #6366f1, #ec4899)',
+            background: 'linear-gradient(135deg, #729b8e, #bd8490)',
             width: '40px',
             height: '40px',
             borderRadius: '12px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            boxShadow: '0 4px 15px rgba(99, 102, 241, 0.4)'
+            boxShadow: '0 4px 15px rgba(114, 155, 142, 0.22)'
           }}>
             <Shield size={22} color="#fff" />
           </div>
@@ -82,7 +82,7 @@ export default function Navbar() {
             <div style={{ fontSize: '1.25rem', fontWeight: '800', letterSpacing: '-0.5px', color: '#fff', lineHeight: 1.1 }}>
               Guardian<span className="text-gradient">Safe</span>
             </div>
-            <div style={{ fontSize: '0.65rem', color: '#818cf8', fontWeight: '600', letterSpacing: '0.5px' }}>
+            <div style={{ fontSize: '0.65rem', color: 'var(--primary-light)', fontWeight: '600', letterSpacing: '0.5px' }}>
               WOMEN SAFETY & EVIDENCE VAULT
             </div>
           </div>
@@ -106,13 +106,13 @@ export default function Navbar() {
                   textDecoration: 'none',
                   fontSize: '0.88rem',
                   fontWeight: active ? '700' : '500',
-                  color: active ? '#fff' : 'var(--text-muted)',
-                  background: active ? 'rgba(99, 102, 241, 0.15)' : 'transparent',
-                  border: active ? '1px solid rgba(99, 102, 241, 0.3)' : '1px solid transparent',
+                  color: active ? 'var(--text-main)' : 'var(--text-muted)',
+                  background: active ? 'rgba(114, 155, 142, 0.14)' : 'transparent',
+                  border: active ? '1px solid rgba(155, 185, 173, 0.24)' : '1px solid transparent',
                   transition: 'all 0.2s ease'
                 }}
               >
-                <Icon size={16} color={active ? '#818cf8' : 'currentColor'} />
+                <Icon size={16} color={active ? 'var(--primary-light)' : 'currentColor'} />
                 {link.name}
               </Link>
             );
@@ -154,8 +154,8 @@ export default function Navbar() {
             style={{
               padding: '0.5rem 0.8rem',
               fontSize: '0.8rem',
-              borderColor: 'rgba(236, 72, 153, 0.3)',
-              color: '#f472b6'
+              borderColor: 'rgba(189, 132, 144, 0.3)',
+              color: '#d5a2ab'
             }}
           >
             <EyeOff size={15} />
@@ -169,8 +169,8 @@ export default function Navbar() {
             style={{
               padding: '0.5rem 0.8rem',
               fontSize: '0.8rem',
-              color: '#38bdf8',
-              borderColor: 'rgba(56, 189, 248, 0.3)'
+              color: '#a0c5ca',
+              borderColor: 'rgba(125, 174, 181, 0.3)'
             }}
           >
             <PhoneCall size={15} />
@@ -216,7 +216,7 @@ export default function Navbar() {
         <div style={{
           marginTop: '0.75rem',
           padding: '1rem',
-          background: 'rgba(15, 23, 42, 0.98)',
+          background: 'rgba(24, 34, 43, 0.98)',
           borderRadius: '16px',
           border: '1px solid var(--border-subtle)',
           display: 'flex',
@@ -240,8 +240,8 @@ export default function Navbar() {
                   textDecoration: 'none',
                   fontSize: '0.95rem',
                   fontWeight: active ? '700' : '500',
-                  color: active ? '#818cf8' : 'var(--text-main)',
-                  background: active ? 'rgba(99, 102, 241, 0.15)' : 'rgba(255, 255, 255, 0.03)'
+                  color: active ? 'var(--primary-light)' : 'var(--text-main)',
+                  background: active ? 'rgba(114, 155, 142, 0.14)' : 'rgba(226, 232, 240, 0.03)'
                 }}
               >
                 <Icon size={18} />
@@ -258,7 +258,7 @@ export default function Navbar() {
                 flex: 1,
                 padding: '0.65rem',
                 textAlign: 'center',
-                background: 'rgba(255,255,255,0.05)',
+                background: 'rgba(226, 232, 240, 0.05)',
                 borderRadius: '8px',
                 color: 'var(--text-muted)',
                 textDecoration: 'none',
@@ -274,7 +274,7 @@ export default function Navbar() {
                 flex: 1,
                 padding: '0.65rem',
                 textAlign: 'center',
-                background: 'rgba(255,255,255,0.05)',
+                background: 'rgba(226, 232, 240, 0.05)',
                 borderRadius: '8px',
                 color: 'var(--text-muted)',
                 textDecoration: 'none',
@@ -290,7 +290,7 @@ export default function Navbar() {
                 flex: 1,
                 padding: '0.65rem',
                 textAlign: 'center',
-                background: 'rgba(255,255,255,0.05)',
+                background: 'rgba(226, 232, 240, 0.05)',
                 borderRadius: '8px',
                 color: 'var(--text-muted)',
                 textDecoration: 'none',

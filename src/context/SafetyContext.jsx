@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 
 const SafetyContext = createContext();
 
@@ -45,7 +45,7 @@ const stopAudioSiren = () => {
     try {
       sirenOsc.stop();
       sirenOsc.disconnect();
-    } catch (_) {}
+    } catch {}
     sirenOsc = null;
   }
 };
@@ -68,7 +68,15 @@ export async function computeSHA256(data) {
 export function SafetyProvider({ children }) {
   // SOS & Emergency
   const [sosActive, setSosActive] = useState(false);
+  const sosActiveRef = useRef(false);
   const [currentCoords, setCurrentCoords] = useState({ lat: 19.0760, lng: 72.8777, address: "BKC Junction, Central District" });
+  const [voiceTriggerEnabled, setVoiceTriggerEnabled] = useState(false);
+  const [voiceTriggerStatus, setVoiceTriggerStatus] = useState('');
+  const [voiceTranscript, setVoiceTranscript] = useState('');
+  const [shakeTriggerEnabled, setShakeTriggerEnabled] = useState(false);
+  const [shakeTriggerStatus, setShakeTriggerStatus] = useState('');
+  const voiceRecognitionRef = useRef(null);
+  const voiceTriggerEnabledRef = useRef(false);
 
   // Stealth Disguise Mode (functional calculator disguise)
   const [stealthMode, setStealthMode] = useState(false);
@@ -209,7 +217,19 @@ export function SafetyProvider({ children }) {
   });
 
   // Handle SOS toggle with audio siren
-  const triggerSOS = () => {
+  const triggerSOS = useCallback(() => {
+    if (sosActiveRef.current) return;
+    sosActiveRef.current = true;
+    if (voiceTriggerEnabledRef.current) setVoiceTriggerStatus('Voice detection stopped after SOS activation.');
+    if (shakeTriggerEnabled) setShakeTriggerStatus('Shake detection stopped after SOS activation.');
+    voiceTriggerEnabledRef.current = false;
+    if (voiceRecognitionRef.current) {
+      voiceRecognitionRef.current.onend = null;
+      try { voiceRecognitionRef.current.stop(); } catch {}
+      voiceRecognitionRef.current = null;
+    }
+    setVoiceTriggerEnabled(false);
+    setShakeTriggerEnabled(false);
     setSosActive(true);
     startAudioSiren();
     // Simulate fetching precise GPS coords
@@ -225,12 +245,151 @@ export function SafetyProvider({ children }) {
         () => {}
       );
     }
-  };
+  }, [shakeTriggerEnabled]);
 
   const cancelSOS = () => {
+    sosActiveRef.current = false;
     setSosActive(false);
     stopAudioSiren();
   };
+
+  const startVoiceTrigger = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setVoiceTriggerStatus('Voice activation is not supported by this browser.');
+      return false;
+    }
+
+    if (voiceRecognitionRef.current) return true;
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
+    recognition.onresult = (event) => {
+      let transcript = '';
+      for (let index = event.resultIndex; index < event.results.length; index += 1) {
+        if (event.results[index].isFinal) transcript += event.results[index][0].transcript;
+      }
+      if (!transcript) return;
+
+      setVoiceTranscript(transcript.trim());
+      if (/\b(help me|need help|emergency|save me)\b/i.test(transcript)) {
+        setVoiceTriggerStatus('Distress phrase detected. SOS is active.');
+        triggerSOS();
+      }
+    };
+    recognition.onerror = (event) => {
+      if (event.error === 'no-speech' || event.error === 'aborted') return;
+      voiceTriggerEnabledRef.current = false;
+      voiceRecognitionRef.current = null;
+      setVoiceTriggerEnabled(false);
+      setVoiceTriggerStatus(event.error === 'not-allowed'
+        ? 'Microphone access was denied. Allow it in your browser settings to use voice activation.'
+        : 'Voice activation stopped. Tap the microphone to try again.');
+    };
+    recognition.onend = () => {
+      if (voiceTriggerEnabledRef.current) {
+        window.setTimeout(() => {
+          if (voiceTriggerEnabledRef.current) {
+            try { recognition.start(); } catch {}
+          }
+        }, 500);
+      }
+    };
+
+    voiceRecognitionRef.current = recognition;
+    voiceTriggerEnabledRef.current = true;
+    setVoiceTranscript('');
+    setVoiceTriggerEnabled(true);
+    setVoiceTriggerStatus('Listening for “help me”, “need help”, “emergency”, or “save me”.');
+    try {
+      recognition.start();
+      return true;
+    } catch {
+      voiceRecognitionRef.current = null;
+      voiceTriggerEnabledRef.current = false;
+      setVoiceTriggerEnabled(false);
+      setVoiceTriggerStatus('Could not start voice activation. Check microphone access and try again.');
+      return false;
+    }
+  };
+
+  const stopVoiceTrigger = () => {
+    voiceTriggerEnabledRef.current = false;
+    if (voiceRecognitionRef.current) {
+      voiceRecognitionRef.current.onend = null;
+      try { voiceRecognitionRef.current.stop(); } catch {}
+      voiceRecognitionRef.current = null;
+    }
+    setVoiceTriggerEnabled(false);
+    setVoiceTriggerStatus('Voice activation is off.');
+  };
+
+  const enableShakeTrigger = async () => {
+    if (!('DeviceMotionEvent' in window)) {
+      setShakeTriggerStatus('Shake detection is not supported by this device.');
+      return false;
+    }
+
+    if (typeof window.DeviceMotionEvent.requestPermission === 'function') {
+      try {
+        const permission = await window.DeviceMotionEvent.requestPermission();
+        if (permission !== 'granted') {
+          setShakeTriggerStatus('Motion access was denied. Allow it in your device settings to use shake activation.');
+          return false;
+        }
+      } catch {
+        setShakeTriggerStatus('Could not request motion access. Try again from a secure connection.');
+        return false;
+      }
+    }
+
+    setShakeTriggerEnabled(true);
+    setShakeTriggerStatus('Shake detection is on. Shake your phone firmly four times to trigger SOS.');
+    return true;
+  };
+
+  const disableShakeTrigger = () => {
+    setShakeTriggerEnabled(false);
+    setShakeTriggerStatus('Shake detection is off.');
+  };
+
+  useEffect(() => {
+    if (!shakeTriggerEnabled) return undefined;
+
+    let previousMagnitude = null;
+    let shakeTimes = [];
+    const handleMotion = (event) => {
+      const acceleration = event.acceleration || event.accelerationIncludingGravity;
+      if (!acceleration || acceleration.x === null || acceleration.y === null || acceleration.z === null) return;
+
+      const magnitude = Math.hypot(acceleration.x, acceleration.y, acceleration.z);
+      const change = previousMagnitude === null ? 0 : Math.abs(magnitude - previousMagnitude);
+      previousMagnitude = magnitude;
+      if (change < 14) return;
+
+      const now = Date.now();
+      shakeTimes = shakeTimes.filter((time) => now - time < 1800);
+      shakeTimes.push(now);
+      if (shakeTimes.length >= 4) {
+        shakeTimes = [];
+        setShakeTriggerStatus('Shake detected. SOS is active.');
+        triggerSOS();
+      }
+    };
+
+    window.addEventListener('devicemotion', handleMotion);
+    return () => window.removeEventListener('devicemotion', handleMotion);
+  }, [shakeTriggerEnabled, triggerSOS]);
+
+  useEffect(() => () => {
+    voiceTriggerEnabledRef.current = false;
+    if (voiceRecognitionRef.current) {
+      try { voiceRecognitionRef.current.stop(); } catch {}
+    }
+    stopAudioSiren();
+  }, []);
 
   // Add Evidence to Blockchain Vault
   const addEvidenceToVault = async ({ title, file, location, category }) => {
@@ -291,6 +450,15 @@ export function SafetyProvider({ children }) {
         sosActive,
         triggerSOS,
         cancelSOS,
+        voiceTriggerEnabled,
+        voiceTriggerStatus,
+        voiceTranscript,
+        startVoiceTrigger,
+        stopVoiceTrigger,
+        shakeTriggerEnabled,
+        shakeTriggerStatus,
+        enableShakeTrigger,
+        disableShakeTrigger,
         stealthMode,
         setStealthMode,
         previewMode,
