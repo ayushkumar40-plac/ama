@@ -7,9 +7,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { hashFile, sealBlock, loadLedger, verifyChain } from '../utils/evidenceVault';
 import { verifyFileAgainstHash, getVaultPin, setVaultPin } from '../utils/evidenceVault';
 import { deleteBlock, downloadJson } from '../utils/evidenceVault';
-import { isFirebaseConfigured, auth } from '../lib/firebase';
-import { cloudSaveBlock } from '../lib/evidenceCloud';
-import { onAuthStateChanged, signInAnonymously } from 'firebase/auth';
+import { useEmulators, isFirebaseConfigured } from '../lib/firebase';
+import { cloudSaveBlock, cloudListBlocks } from '../lib/evidenceCloud';
+import { useAuth } from '../lib/auth.jsx';
 
 const ACCEPT = 'audio/*,video/*,image/*,.pdf,.txt,.json,.log';
 function useGeo() {
@@ -67,16 +67,26 @@ export default function BlockchainVault() {
     count: chain.length,
     lastTx: chain.length ? chain[chain.length - 1].txHash.slice(0, 14) + '...' : '-',
   }), [chain]);
-  const [user, setUser] = useState(null);
+  const { user } = useAuth();
   const [cloudMsg, setCloudMsg] = useState('');
-  useEffect(() => {
-    if (!isFirebaseConfigured || !auth) return;
-    const unsub = onAuthStateChanged(auth, (u) => {
-      if (u) setUser(u);
-      else signInAnonymously(auth).catch(() => {});
-    });
-    return () => unsub();
-  }, []);
+  const [cloudBlocks, setCloudBlocks] = useState([]);
+  const [cloudLoading, setCloudLoading] = useState(false);
+
+  const refreshCloud = async (uid) => {
+    const id = uid || user?.uid;
+    if (!id) return;
+    setCloudLoading(true);
+    try {
+      const res = await cloudListBlocks(id);
+      setCloudBlocks(res.blocks || []);
+    } catch {
+      setCloudBlocks([]);
+    } finally {
+      setCloudLoading(false);
+    }
+  };
+
+  useEffect(() => { if (user?.uid) refreshCloud(user.uid); }, [user?.uid]);
 
   const sealFileObject = async (file, label) => {
     setFileMeta({ name: file.name, size: file.size, type: file.type || 'unknown' });
@@ -93,12 +103,13 @@ export default function BlockchainVault() {
       fileSize: file.size, location, note: note || label || '', accessList,
     });
     setSealedBlock(res.block); setChain(res.chain); setUploadState('success');
-    if (isFirebaseConfigured) {
-      setCloudMsg('Mirroring hash to Firebase…');
-      const out = await cloudSaveBlock(res.block, user?.uid || 'anonymous').catch(() => ({ ok: false }));
-      setCloudMsg(out.ok ? 'Mirrored to Firebase (hash only, media stays private).' : 'Local seal OK. Firebase mirror skipped — add config in src/lib/firebase.js.');
-    } else {
-      setCloudMsg('Local seal OK (demo mode). Paste Firebase keys to enable cloud backup.');
+    try {
+      setCloudMsg(useEmulators && !isFirebaseConfigured ? 'Saving to local Firebase emulator…' : 'Mirroring hash to Firebase…');
+      const out = await cloudSaveBlock(res.block, user?.uid || 'anonymous');
+      setCloudMsg(out.ok ? 'Backed up to Firebase (hash only — media stays private).' : 'Saved locally.');
+      refreshCloud();
+    } catch (e) {
+      setCloudMsg('Firebase unreachable — kept local seal. Run `npm run emulators` or add .env keys.');
     }
   };
 
@@ -283,11 +294,21 @@ export default function BlockchainVault() {
                 <button onClick={handleVerifyChain} disabled={verifying || !chain.length} style={chipBtn}>
                   <RefreshCw size={14} /> {verifying ? 'Verifying...' : 'Verify chain'}
                 </button>
+                <button onClick={() => refreshCloud()} disabled={cloudLoading} style={chipBtn}>
+                  <RefreshCw size={14} /> {cloudLoading ? 'Syncing…' : `Cloud (${cloudBlocks.length})`}
+                </button>
                 {chain.length > 0 && (
                   <button onClick={() => downloadJson('guardian-evidence-ledger.json', chain)} style={chipBtn}><Download size={14} /> Backup</button>
                 )}
               </div>
             </div>
+            <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
+              {useEmulators && !isFirebaseConfigured
+                ? 'Firebase target: local emulator (127.0.0.1). Run `npm run emulators`.'
+                : isFirebaseConfigured
+                  ? ('Firebase target: cloud project (' + (user?.uid ? 'signed in' : 'connecting…') + ').')
+                  : 'Firebase target: none — local ledger only.'}
+            </p>
             {chainStatus && (
               <div style={{ ...hashBox, borderColor: chainStatus.ok ? '#22c55e' : '#ef4444', color: chainStatus.ok ? '#86efac' : '#fca5a5' }}>
                 {chainStatus.ok ? `Chain intact - ${chainStatus.results.length} block(s) verified.` : 'Chain broken - possible tampering.'}

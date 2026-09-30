@@ -1,10 +1,16 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Shield, Map, PhoneCall, Route, Volume2, BatteryWarning, Database } from 'lucide-react';
+import { Shield, Map, PhoneCall, Route, Volume2, BatteryWarning, Database, Cloud, CloudOff, LogOut } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../lib/auth.jsx';
 
 function Dashboard() {
   const navigate = useNavigate();
+  const { user, mode, authReady, signInEmail, signUpEmail, signOutNow } = useAuth();
+  const [showLogin, setShowLogin] = useState(false);
+  const [email, setEmail] = useState('');
+  const [pw, setPw] = useState('');
+  const [authErr, setAuthErr] = useState('');
 
   const features = [
     { title: "AI Voice Trigger", desc: "Trigger alerts completely hands-free with a custom voice code.", icon: Volume2, path: "/voice-trigger" },
@@ -25,11 +31,46 @@ function Dashboard() {
             Guardian<span className="text-gradient">Network</span>
           </h1>
         </div>
-        <div>
-          <button className="btn-secondary" style={{ marginRight: '1rem' }}>Login</button>
-          <button className="btn-primary">Get the App</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <span title={mode === 'cloud' ? 'Firebase cloud connected' : mode === 'emulator' ? 'Local Firebase emulator' : 'Offline demo mode'}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem', color: 'var(--text-muted)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '9999px', padding: '0.35rem 0.7rem' }}>
+            {mode === 'offline' ? <CloudOff size={13} /> : <Cloud size={13} />}
+            {mode === 'cloud' ? 'Firebase live' : mode === 'emulator' ? 'Emulator' : 'Offline'}
+          </span>
+          {authReady && user && !user.isAnonymous && (
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{user.email}</span>
+          )}
+          {authReady && user && !user.isAnonymous ? (
+            <button className="btn-secondary" onClick={signOutNow} title="Sign out" style={{ padding: '0.5rem 1rem' }}><LogOut size={14} /></button>
+          ) : (
+            <button className="btn-secondary" style={{ marginRight: '1rem' }} onClick={() => setShowLogin((s) => !s)}>Login</button>
+          )}
+          <button className="btn-primary" onClick={() => navigate('/vault')}>Get the App</button>
         </div>
       </nav>
+      {showLogin && (
+        <div className="glass-panel" style={{ maxWidth: '420px', margin: '-2rem auto 2rem', padding: '1.5rem' }}>
+          <h4 style={{ fontWeight: 700, marginBottom: '0.5rem' }}>NGO / Legal sign-in</h4>
+          <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginBottom: '0.75rem' }}>Survivors stay anonymous automatically. Named accounts are for verifiers.</p>
+          <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" type="email"
+            style={{ width: '100%', marginBottom: '0.5rem', padding: '0.7rem', borderRadius: '10px', border: '1px solid var(--border-color)', background: 'rgba(0,0,0,0.25)', color: '#fff' }} />
+          <input value={pw} onChange={(e) => setPw(e.target.value)} placeholder="Password" type="password"
+            style={{ width: '100%', marginBottom: '0.75rem', padding: '0.7rem', borderRadius: '10px', border: '1px solid var(--border-color)', background: 'rgba(0,0,0,0.25)', color: '#fff' }} />
+          {authErr && <p style={{ color: '#f87171', fontSize: '0.8rem', marginBottom: '0.5rem' }}>{authErr}</p>}
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button className="btn-primary" style={{ flex: 1 }} onClick={async () => {
+              setAuthErr('');
+              try { await signInEmail(email, pw); setShowLogin(false); }
+              catch (e) { setAuthErr(e?.message || 'Sign-in failed.'); }
+            }}>Sign in</button>
+            <button className="btn-secondary" style={{ flex: 1 }} onClick={async () => {
+              setAuthErr('');
+              try { await signUpEmail(email, pw, 'ngo'); setShowLogin(false); }
+              catch (e) { setAuthErr(e?.message || 'Sign-up failed.'); }
+            }}>Create NGO account</button>
+          </div>
+        </div>
+      )}
 
       {/* Hero Section */}
       <motion.section 

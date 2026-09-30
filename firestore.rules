@@ -1,8 +1,17 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // User profiles: self read/write only.
+    match /users/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow create: if request.auth != null && request.auth.uid == uid;
+      allow update: if request.auth != null && request.auth.uid == uid;
+      allow delete: if false;
+    }
     // Evidence vault: owner has full access; grantees named in
     // `accessList` get read access. Everything else denied.
+    // In emulator / anonymous mode request.auth may be anonymous — the
+    // ownerUid check still binds each record to its creator.
     match /evidence/{id} {
       allow create: if request.auth != null
         && request.resource.data.ownerUid == request.auth.uid
@@ -17,3 +26,4 @@ service cloud.firestore {
     }
   }
 }
+

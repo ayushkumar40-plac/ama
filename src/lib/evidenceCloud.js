@@ -3,16 +3,19 @@
 // metadata are written to Firestore so NGOs / legal advisors can verify
 // without ever seeing private media. Rules (see firestore.rules) lock
 // each record to its owner + explicit grantees.
+//
+// Works against BOTH the local emulator suite and a real project — the
+// firebase.js layer decides the target. No config = calls below throw
+// 'unavailable', and the vault falls back to the localStorage ledger.
 import {
   collection, addDoc, query, where, orderBy, getDocs,
   serverTimestamp, deleteDoc, doc,
 } from 'firebase/firestore';
-import { db, isFirebaseConfigured } from './firebase';
+import { db } from './firebase';
 
 const COLLECTION = 'evidence';
 
 export async function cloudSaveBlock(block, ownerUid) {
-  if (!isFirebaseConfigured || !db) return { ok: false, reason: 'firebase-not-configured' };
   const ref = await addDoc(collection(db, COLLECTION), {
     ...block,
     ownerUid: ownerUid || 'anonymous',
@@ -22,7 +25,6 @@ export async function cloudSaveBlock(block, ownerUid) {
 }
 
 export async function cloudListBlocks(ownerUid) {
-  if (!isFirebaseConfigured || !db) return { ok: false, reason: 'firebase-not-configured', blocks: [] };
   const q = query(
     collection(db, COLLECTION),
     where('ownerUid', '==', ownerUid || 'anonymous'),
@@ -33,7 +35,7 @@ export async function cloudListBlocks(ownerUid) {
 }
 
 export async function cloudDeleteBlock(cloudId) {
-  if (!isFirebaseConfigured || !db) return { ok: false, reason: 'firebase-not-configured' };
   await deleteDoc(doc(db, COLLECTION, cloudId));
   return { ok: true };
 }
+
