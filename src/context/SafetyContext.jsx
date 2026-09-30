@@ -220,7 +220,7 @@ export function SafetyProvider({ children }) {
   const triggerSOS = useCallback(() => {
     if (sosActiveRef.current) return;
     sosActiveRef.current = true;
-    if (voiceTriggerEnabledRef.current) setVoiceTriggerStatus('Voice detection stopped after SOS activation.');
+      if (voiceTriggerEnabledRef.current) setVoiceTriggerStatus('Voice detection stopped after SOS activation.');
     if (shakeTriggerEnabled) setShakeTriggerStatus('Shake detection stopped after SOS activation.');
     voiceTriggerEnabledRef.current = false;
     if (voiceRecognitionRef.current) {
@@ -274,7 +274,7 @@ export function SafetyProvider({ children }) {
       if (!transcript) return;
 
       setVoiceTranscript(transcript.trim());
-      if (/\b(help me|need help|emergency|save me)\b/i.test(transcript)) {
+         if (/\b(help|emergency|save me)\b/i.test(transcript)) {
         setVoiceTriggerStatus('Distress phrase detected. SOS is active.');
         triggerSOS();
       }
@@ -302,7 +302,7 @@ export function SafetyProvider({ children }) {
     voiceTriggerEnabledRef.current = true;
     setVoiceTranscript('');
     setVoiceTriggerEnabled(true);
-    setVoiceTriggerStatus('Listening for “help me”, “need help”, “emergency”, or “save me”.');
+       setVoiceTriggerStatus('Listening for “help”, “emergency”, or “save me”.');
     try {
       recognition.start();
       return true;

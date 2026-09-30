@@ -60,7 +60,7 @@ export default function VoiceTrigger() {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
                 <div>
                   <h3 style={{ fontSize: '1rem', marginBottom: '0.25rem' }}>Voice phrase</h3>
-                  <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>“Help me”, “need help”, “emergency”, or “save me”</p>
+                   <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>“Help”, “emergency”, or “save me”</p>
                 </div>
                 <button onClick={toggleVoiceTrigger} className={voiceTriggerEnabled ? 'btn-danger' : 'btn-secondary'} style={{ flexShrink: 0 }}>
                   {voiceTriggerEnabled ? <MicOff size={17} /> : <Mic size={17} />}
