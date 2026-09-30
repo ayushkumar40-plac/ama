@@ -57,9 +57,16 @@ export default function BlockchainVault() {
   const chunksRef = useRef([]);
   const streamRef = useRef(null);
   const timerRef = useRef(null);
+  const previewRef = useRef(null);
+  const autoTimerRef = useRef(null);
+  const autoArmedRef = useRef(false);
+  const [autoSegSecs, setAutoSegSecs] = useState(30);
+  const [autoCount, setAutoCount] = useState(0);
 
   useEffect(() => () => {
     clearInterval(timerRef.current);
+    clearTimeout(autoTimerRef.current);
+    autoArmedRef.current = false;
     if (streamRef.current) streamRef.current.getTracks().forEach((t) => t.stop());
   }, []);
 
@@ -139,29 +146,105 @@ export default function BlockchainVault() {
     });
   };
 
+  const acquireStream = async (kind) => {
+    if (streamRef.current && streamRef.current.active) return streamRef.current;
+    const stream = await navigator.mediaDevices.getUserMedia(
+      kind === 'audio' ? { audio: true } : { audio: true, video: true }
+    );
+    streamRef.current = stream;
+    if (previewRef.current) previewRef.current.srcObject = stream;
+    return stream;
+  };
+
+  const beginSegment = (kind, isAuto) => {
+    chunksRef.current = [];
+    const stream = streamRef.current;
+    if (!stream) return;
+    const rec = new MediaRecorder(stream);
+    mediaRecorderRef.current = rec;
+    rec.ondataavailable = (ev) => ev.data.size && chunksRef.current.push(ev.data);
+    rec.onstop = async () => {
+      clearInterval(timerRef.current);
+      clearTimeout(autoTimerRef.current);
+      const blob = new Blob(chunksRef.current, { type: kind === 'audio' ? 'audio/webm' : 'video/webm' });
+      const file = new File([blob], `${isAuto ? 'auto' : 'live'}-${kind}-${Date.now()}.webm`, { type: blob.type });
+      if (!isAuto) {
+        stream.getTracks().forEach((t) => t.stop());
+        setRecState('idle');
+        setRecSecs(0);
+        await sealFileObject(file, `Live ${kind} capture`);
+        return;
+      }
+      // Auto mode: seal this segment, then roll straight into the next one
+      // on the same camera stream (no second permission prompt).
+      setAutoCount((c) => c + 1);
+      try { await sealFileObject(file, `Auto video segment`); }
+      catch (err) { console.error(err); }
+      if (autoArmedRef.current) {
+        beginSegment(kind, true);
+      } else {
+        stream.getTracks().forEach((t) => t.stop());
+        setRecState('idle');
+        setRecSecs(0);
+      }
+    };
+    rec.start();
+    if (isAuto) {
+      setRecState('recording-auto');
+      autoTimerRef.current = setTimeout(() => {
+        if (rec.state !== 'inactive') rec.stop();
+      }, autoSegSecs * 1000);
+    } else {
+      setRecState(kind === 'audio' ? 'recording-audio' : 'recording-video');
+    }
+    setRecSecs(0);
+    timerRef.current = setInterval(() => setRecSecs((s) => s + 1), 1000);
+  };
+
   const startRecording = async (kind) => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia(kind === 'audio' ? { audio: true } : { audio: true, video: true });
-      streamRef.current = stream; chunksRef.current = [];
-      const rec = new MediaRecorder(stream);
-      mediaRecorderRef.current = rec;
-      rec.ondataavailable = (ev) => ev.data.size && chunksRef.current.push(ev.data);
-      rec.onstop = async () => {
-        clearInterval(timerRef.current);
-        const blob = new Blob(chunksRef.current, { type: kind === 'audio' ? 'audio/webm' : 'video/webm' });
-        const file = new File([blob], `live-${kind}-${Date.now()}.webm`, { type: blob.type });
-        stream.getTracks().forEach((t) => t.stop());
-        setRecState('idle'); setRecSecs(0);
-        await sealFileObject(file, `Live ${kind} capture`);
-      };
-      rec.start();
-      setRecState(kind === 'audio' ? 'recording-audio' : 'recording-video');
-      setRecSecs(0);
-      timerRef.current = setInterval(() => setRecSecs((s) => s + 1), 1000);
+      await acquireStream(kind);
+      beginSegment(kind, false);
     } catch { alert('Microphone/camera unavailable or permission denied.'); }
   };
 
-  const stopRecording = () => { if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') mediaRecorderRef.current.stop(); };
+  // ---- Auto video recording: arm once, records forever in segments ----
+  const armAutoRecord = async () => {
+    try {
+      await acquireStream('video');
+      autoArmedRef.current = true;
+      setAutoCount(0);
+      beginSegment('video', true);
+    } catch {
+      alert('Camera/mic permission denied — auto-record needs camera access.');
+    }
+  };
+
+  const disarmAutoRecord = () => {
+    autoArmedRef.current = false;
+    const rec = mediaRecorderRef.current;
+    if (rec && rec.state !== 'inactive') {
+      rec.stop(); // final segment gets sealed by onstop, then loop exits
+    } else if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      setRecState('idle');
+      setRecSecs(0);
+    }
+  };
+
+  const stopRecording = () => {
+    if (recState === 'recording-auto') { disarmAutoRecord(); return; }
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') mediaRecorderRef.current.stop();
+  };
+
+  // Attach live camera feed to the preview <video> once it is mounted.
+  useEffect(() => {
+    if (previewRef.current && streamRef.current &&
+        (recState === 'recording-auto' || recState === 'recording-video')) {
+      previewRef.current.srcObject = streamRef.current;
+      previewRef.current.play?.().catch(() => {});
+    }
+  }, [recState]);
   const resetFlow = () => { setUploadState('idle'); setFileMeta(null); setFileHash(''); setSealedBlock(null); setVerifyResult(null); };
   const unlockSubmit = (e) => {
     e.preventDefault();
@@ -228,14 +311,72 @@ export default function BlockchainVault() {
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
               <button onClick={capture} style={chipBtn}><MapPin size={14} /> {locStatus === 'fetching' ? 'Locating...' : loc ? `GPS ${loc.lat}, ${loc.lng}` : 'Capture GPS'}</button>
               {recState === 'idle' ? (
-                <span style={{ display: 'flex', gap: '0.5rem' }}>
+                <span style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                   <button onClick={() => startRecording('audio')} style={chipBtn}><Mic size={14} /> Record audio</button>
                   <button onClick={() => startRecording('video')} style={chipBtn}><Video size={14} /> Record video</button>
+                  <button onClick={armAutoRecord} style={{ ...chipBtn, borderColor: '#ef4444', color: '#fca5a5' }}>
+                    <Video size={14} /> Auto-record video (hands-free)
+                  </button>
                 </span>
+              ) : recState === 'recording-auto' ? (
+                <button onClick={stopRecording} style={{ ...chipBtn, borderColor: '#ef4444', color: '#f87171' }}>
+                  <motion.span
+                    animate={{ opacity: [1, 0.2, 1] }}
+                    transition={{ repeat: Infinity, duration: 1 }}
+                    style={{ display: 'inline-block', width: 9, height: 9, borderRadius: '50%', background: '#ef4444' }}
+                  />
+                  Auto-recording {recSecs}s · {autoCount} sealed — stop
+                </button>
               ) : (
                 <button onClick={stopRecording} style={{ ...chipBtn, borderColor: '#ef4444', color: '#f87171' }}>Recording {recSecs}s - stop and seal</button>
               )}
             </div>
+
+            {/* Auto-record setup: segment length + explanation */}
+            {recState === 'idle' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                <span>Segment length:</span>
+                {[15, 30, 60].map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setAutoSegSecs(s)}
+                    style={{
+                      ...chipBtn,
+                      padding: '0.3rem 0.7rem',
+                      borderColor: autoSegSecs === s ? 'var(--primary-color)' : undefined,
+                      color: autoSegSecs === s ? '#a5b4fc' : undefined,
+                    }}
+                  >{s}s</button>
+                ))}
+                <span>— each segment is hashed & chained automatically, forever, until you stop.</span>
+              </div>
+            )}
+
+            {/* Live camera preview while auto/manual video is rolling */}
+            {(recState === 'recording-auto' || recState === 'recording-video') && (
+              <div style={{ position: 'relative', borderRadius: '12px', overflow: 'hidden', border: '1px solid #ef4444' }}>
+                <video
+                  ref={previewRef}
+                  autoPlay
+                  muted
+                  playsInline
+                  style={{ width: '100%', display: 'block', maxHeight: '240px', objectFit: 'cover', background: '#000' }}
+                />
+                <span style={{
+                  position: 'absolute', top: 8, left: 8, display: 'flex', alignItems: 'center', gap: 6,
+                  background: 'rgba(0,0,0,0.65)', color: '#fff', fontSize: '0.75rem', padding: '0.25rem 0.6rem', borderRadius: '9999px',
+                }}>
+                  <motion.span
+                    animate={{ opacity: [1, 0.2, 1] }}
+                    transition={{ repeat: Infinity, duration: 1 }}
+                    style={{ width: 8, height: 8, borderRadius: '50%', background: '#ef4444', display: 'inline-block' }}
+                  />
+                  {recState === 'recording-auto'
+                    ? `REC · segment ${autoCount + 1} · ${recSecs}s / ${autoSegSecs}s`
+                    : `REC · ${recSecs}s`}
+                </span>
+              </div>
+            )}
           </div>
 
 
