@@ -7,6 +7,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { hashFile, sealBlock, loadLedger, verifyChain } from '../utils/evidenceVault';
 import { verifyFileAgainstHash, getVaultPin, setVaultPin } from '../utils/evidenceVault';
 import { deleteBlock, downloadJson } from '../utils/evidenceVault';
+import { isFirebaseConfigured, auth } from '../lib/firebase';
+import { cloudSaveBlock } from '../lib/evidenceCloud';
+import { onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 
 const ACCEPT = 'audio/*,video/*,image/*,.pdf,.txt,.json,.log';
 function useGeo() {
@@ -64,6 +67,17 @@ export default function BlockchainVault() {
     count: chain.length,
     lastTx: chain.length ? chain[chain.length - 1].txHash.slice(0, 14) + '...' : '-',
   }), [chain]);
+  const [user, setUser] = useState(null);
+  const [cloudMsg, setCloudMsg] = useState('');
+  useEffect(() => {
+    if (!isFirebaseConfigured || !auth) return;
+    const unsub = onAuthStateChanged(auth, (u) => {
+      if (u) setUser(u);
+      else signInAnonymously(auth).catch(() => {});
+    });
+    return () => unsub();
+  }, []);
+
   const sealFileObject = async (file, label) => {
     setFileMeta({ name: file.name, size: file.size, type: file.type || 'unknown' });
     setVerifyResult(null); setSealedBlock(null);
@@ -79,6 +93,13 @@ export default function BlockchainVault() {
       fileSize: file.size, location, note: note || label || '', accessList,
     });
     setSealedBlock(res.block); setChain(res.chain); setUploadState('success');
+    if (isFirebaseConfigured) {
+      setCloudMsg('Mirroring hash to Firebase…');
+      const out = await cloudSaveBlock(res.block, user?.uid || 'anonymous').catch(() => ({ ok: false }));
+      setCloudMsg(out.ok ? 'Mirrored to Firebase (hash only, media stays private).' : 'Local seal OK. Firebase mirror skipped — add config in src/lib/firebase.js.');
+    } else {
+      setCloudMsg('Local seal OK (demo mode). Paste Firebase keys to enable cloud backup.');
+    }
   };
 
   const handleFileSelect = async (e) => {
@@ -247,6 +268,7 @@ export default function BlockchainVault() {
                   <button onClick={resetFlow} className="btn-secondary" style={{ flex: 1, padding: '0.8rem' }}>Seal another</button>
                   <button onClick={() => downloadJson(`evidence-${sealedBlock.txHash}.json`, sealedBlock)} style={{ ...chipBtn, flex: 1, justifyContent: 'center' }}><Download size={14} /> Export certificate</button>
                 </div>
+                {cloudMsg && <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.75rem', textAlign: 'center' }}>{cloudMsg}</p>}
               </motion.div>
             )}
           </AnimatePresence>

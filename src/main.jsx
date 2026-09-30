@@ -4,9 +4,12 @@ import { BrowserRouter } from 'react-router-dom'
 import './index.css'
 import App from './App.jsx'
 
+// Served from repo sub-path on GitHub Pages (vite `base`), root on Vercel.
+const basename = import.meta.env.BASE_URL === '/' ? '/' : import.meta.env.BASE_URL.replace(/\/$/, '');
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <BrowserRouter>
+    <BrowserRouter basename={basename === '/' ? undefined : basename}>
       <App />
     </BrowserRouter>
   </StrictMode>,

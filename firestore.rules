@@ -1,0 +1,19 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Evidence vault: owner has full access; grantees named in
+    // `accessList` get read access. Everything else denied.
+    match /evidence/{id} {
+      allow create: if request.auth != null
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.keys().hasAll(['fileHash', 'blockHash', 'txHash']);
+      allow read: if request.auth != null
+        && (resource.data.ownerUid == request.auth.uid
+          || request.auth.token.email in resource.data.accessList
+          || request.auth.uid in resource.data.accessList);
+      allow delete: if request.auth != null
+        && resource.data.ownerUid == request.auth.uid;
+      allow update: if false; // append-only: no edits, ever
+    }
+  }
+}
