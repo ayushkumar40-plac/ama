@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Shield, Map, PhoneCall, Route, Volume2, BatteryWarning } from 'lucide-react';
+import { Shield, Map, PhoneCall, Route, Volume2, BatteryWarning, Database } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 function Dashboard() {
@@ -12,6 +12,7 @@ function Dashboard() {
     { title: "Fake Call System", desc: "Escape unsafe situations with realistic pre-recorded calls.", icon: PhoneCall, path: "/fake-call" },
     { title: "Safe Route Navigation", desc: "Find the safest path home based on real-time crowd data.", icon: Route, path: "/safe-route" },
     { title: "Emergency Battery Alert", desc: "Auto-alerts contacts if your battery drops to critical levels.", icon: BatteryWarning, path: "/battery-alert" },
+    { title: "Blockchain Evidence Vault", desc: "Seal audio, video & location proof with SHA-256 + tamper-proof ledger.", icon: Database, path: "/vault", highlight: true },
   ];
 
   return (

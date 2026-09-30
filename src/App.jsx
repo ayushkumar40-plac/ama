@@ -6,6 +6,7 @@ import BatteryAlert from './pages/BatteryAlert';
 import VoiceTrigger from './pages/VoiceTrigger';
 import LocationTracker from './pages/LocationTracker';
 import SafeRoute from './pages/SafeRoute';
+import BlockchainVault from './pages/BlockchainVault';
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
       <Route path="/location" element={<LocationTracker />} />
       <Route path="/safe-route" element={<SafeRoute />} />
       <Route path="/battery-alert" element={<BatteryAlert />} />
+      <Route path="/vault" element={<BlockchainVault />} />
     </Routes>
   );
 }
