@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useSafety } from '../context/SafetyContext';
+import { useAuth } from '../lib/auth.jsx';
 import {
   Shield,
   MapPin,
@@ -21,12 +22,20 @@ import {
   KeyRound,
   ShieldCheck,
   Share2,
-  Sparkles
+  Sparkles,
+  Cloud,
+  CloudOff,
+  LogOut
 } from 'lucide-react';
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const { triggerSOS, setHelplineModalOpen, setStealthMode } = useSafety();
+  const { user, mode, authReady, signInEmail, signUpEmail, signOutNow } = useAuth();
+  const [showLogin, setShowLogin] = useState(false);
+  const [email, setEmail] = useState('');
+  const [pw, setPw] = useState('');
+  const [authErr, setAuthErr] = useState('');
 
   const corePillars = [
     {
@@ -77,6 +86,40 @@ export default function Dashboard() {
 
   return (
     <div className="app-container">
+      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', marginBottom: '0.5rem' }}>
+        <span title={mode === 'cloud' ? 'Firebase cloud connected' : mode === 'emulator' ? 'Local Firebase emulator' : 'Offline demo mode'} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+          {mode === 'offline' ? <CloudOff size={14} /> : <Cloud size={14} />}
+          {mode === 'cloud' ? 'Firebase live' : mode === 'emulator' ? 'Emulator' : 'Offline'}
+        </span>
+        {authReady && user && !user.isAnonymous && <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>{user.email}</span>}
+        {authReady && user && !user.isAnonymous
+          ? <button className="btn-secondary" onClick={signOutNow} title="Sign out" style={{ padding: '0.5rem 0.75rem' }}><LogOut size={15} /></button>
+          : <button className="btn-secondary" onClick={() => setShowLogin((shown) => !shown)} style={{ padding: '0.5rem 0.75rem' }}>NGO sign in</button>}
+        <button className="btn-secondary" onClick={() => navigate('/vault')} style={{ padding: '0.5rem 0.75rem' }}><Database size={15} /> Blockchain Vault</button>
+      </div>
+
+      {showLogin && (
+        <div className="glass-panel" style={{ maxWidth: '420px', margin: '0 0 2rem auto', padding: '1.25rem', textAlign: 'left' }}>
+          <h3 style={{ fontSize: '1rem', marginBottom: '0.5rem' }}>NGO / Legal sign-in</h3>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginBottom: '0.75rem' }}>Named accounts are for NGO and legal verifiers.</p>
+          <input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Email" type="email" autoComplete="email" style={{ marginBottom: '0.5rem' }} />
+          <input value={pw} onChange={(event) => setPw(event.target.value)} placeholder="Password" type="password" autoComplete="current-password" style={{ marginBottom: '0.75rem' }} />
+          {authErr && <p role="alert" style={{ color: '#e9a0a0', fontSize: '0.82rem', marginBottom: '0.5rem' }}>{authErr}</p>}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <button className="btn-primary" style={{ flex: 1 }} onClick={async () => {
+              setAuthErr('');
+              try { await signInEmail(email, pw); setShowLogin(false); }
+              catch (error) { setAuthErr(error?.message || 'Sign-in failed.'); }
+            }}>Sign in</button>
+            <button className="btn-secondary" style={{ flex: 1 }} onClick={async () => {
+              setAuthErr('');
+              try { await signUpEmail(email, pw, 'ngo'); setShowLogin(false); }
+              catch (error) { setAuthErr(error?.message || 'Sign-up failed.'); }
+            }}>Create NGO account</button>
+          </div>
+        </div>
+      )}
+
       {/* Top Hero Section */}
       <motion.section
         initial={{ opacity: 0, y: 15 }}

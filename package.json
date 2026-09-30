@@ -7,9 +7,15 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "emulators": "firebase emulators:start --only auth,firestore,database",
+    "firebase:login": "firebase login",
+    "deploy:rules": "firebase deploy --only firestore:rules,database"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/core": "^8.5.2",
+    "firebase": "^12.19.0",
     "framer-motion": "^13.4.6",
     "lucide-react": "^1.48.0",
     "react": "^19.2.8",
@@ -17,6 +23,7 @@
     "react-router-dom": "^7.18.4"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.2",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^6.1.1",

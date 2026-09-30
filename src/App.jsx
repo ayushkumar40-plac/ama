@@ -19,6 +19,7 @@ import FakeCall from './pages/FakeCall';
 import BatteryAlert from './pages/BatteryAlert';
 import VoiceTrigger from './pages/VoiceTrigger';
 import LocationTracker from './pages/LocationTracker';
+import BlockchainVault from './pages/BlockchainVault';
 
 function MainAppLayout() {
   const { stealthMode } = useSafety();
@@ -44,6 +45,7 @@ function MainAppLayout() {
             <Route path="/voice-trigger" element={<VoiceTrigger />} />
             <Route path="/location" element={<LocationTracker />} />
             <Route path="/battery-alert" element={<BatteryAlert />} />
+            <Route path="/vault" element={<BlockchainVault />} />
           </Routes>
         </main>
       </MobileSimulatorWrapper>
