@@ -1,40 +1,86 @@
-import React, { useState, useEffect } from 'react';
-import { MapPin, Navigation, ArrowLeft, Users, ShieldCheck } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { MapPin, Navigation, ArrowLeft, Users, ShieldCheck, Radio, CloudOff } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useAuth } from '../lib/auth.jsx';
+import { publishLiveLocation, stopLiveLocation } from '../lib/realtime';
+import { useEmulators, isFirebaseConfigured } from '../lib/firebase';
 
 export default function LocationTracker() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [location, setLocation] = useState(null);
   const [tracking, setTracking] = useState(false);
   const [error, setError] = useState(null);
+  const [cloudState, setCloudState] = useState('idle'); // idle, live, error
+  const watchId = useRef(null);
+
+  const pushCloud = async (lat, lng, accuracy) => {
+    const uid = user?.uid;
+    if (!uid) return;
+    try {
+      await publishLiveLocation(uid, { lat: Number(lat), lng: Number(lng), accuracy: accuracy || 0, tracking: true });
+      setCloudState('live');
+    } catch {
+      setCloudState('error');
+    }
+  };
 
   const startTracking = () => {
     setTracking(true);
+    setError(null);
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          setLocation({
-            lat: position.coords.latitude.toFixed(6),
-            lng: position.coords.longitude.toFixed(6)
-          });
+          const lat = position.coords.latitude.toFixed(6);
+          const lng = position.coords.longitude.toFixed(6);
+          setLocation({ lat, lng });
+          pushCloud(lat, lng, Math.round(position.coords.accuracy || 0));
         },
         (err) => {
           setError(err.message);
           // Mock location if denied or error
           setLocation({ lat: "37.774929", lng: "-122.419418" });
+          pushCloud("37.774929", "-122.419418", 0);
         }
       );
+      // Continuous updates -> realtime writes
+      try {
+        watchId.current = navigator.geolocation.watchPosition(
+          (position) => {
+            const lat = position.coords.latitude.toFixed(6);
+            const lng = position.coords.longitude.toFixed(6);
+            setLocation({ lat, lng });
+            pushCloud(lat, lng, Math.round(position.coords.accuracy || 0));
+          },
+          () => {},
+          { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 }
+        );
+      } catch {}
     } else {
       setError("Geolocation not supported.");
       setLocation({ lat: "37.774929", lng: "-122.419418" });
     }
   };
 
-  const stopTracking = () => {
+  const stopTracking = async () => {
+    if (watchId.current != null) {
+      try { navigator.geolocation.clearWatch(watchId.current); } catch {}
+      watchId.current = null;
+    }
     setTracking(false);
     setLocation(null);
+    setCloudState('idle');
+    if (user?.uid) {
+      try { await stopLiveLocation(user.uid); } catch {}
+    }
   };
+
+  useEffect(() => () => {
+    if (watchId.current != null) {
+      try { navigator.geolocation.clearWatch(watchId.current); } catch {}
+    }
+  }, []);
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', padding: '2rem' }}>
@@ -59,9 +105,17 @@ export default function LocationTracker() {
           </div>
           
           <h2 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '1rem' }}>Live Location Tracking</h2>
-          <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>
+          <p style={{ color: 'var(--text-muted)', marginBottom: '1rem' }}>
             Share your real-time coordinates securely with verified volunteers and trusted contacts.
           </p>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem', color: 'var(--text-muted)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '9999px', padding: '0.35rem 0.8rem', marginBottom: '1.5rem' }}>
+            {cloudState === 'live' ? <Radio size={13} color="#22c55e" /> : <CloudOff size={13} />}
+            {cloudState === 'live'
+              ? `Streaming to RTDB (${useEmulators && !isFirebaseConfigured ? 'emulator :9000' : 'cloud'})`
+              : cloudState === 'error'
+                ? 'RTDB unreachable — local only'
+                : `RTDB standby (${useEmulators && !isFirebaseConfigured ? 'emulator' : isFirebaseConfigured ? 'cloud' : 'offline'})`}
+          </div>
 
           {!tracking ? (
             <button onClick={startTracking} className="btn-primary" style={{ fontSize: '1.1rem', padding: '1rem 2rem' }}>

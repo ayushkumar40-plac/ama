@@ -1,0 +1,30 @@
+{
+  "rules": {
+    "liveLocations": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid == $uid || root.child('shares').child($uid).child(auth.uid).exists())",
+        ".write": "auth != null && auth.uid == $uid"
+      }
+    },
+    "shares": {
+      "$owner": {
+        "$viewer": {
+          ".read": "auth != null && (auth.uid == $owner || auth.uid == $viewer)",
+          ".write": "auth != null && auth.uid == $owner"
+        }
+      }
+    },
+    "sos": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid == $uid || root.child('shares').child($uid).child(auth.uid).exists())",
+        ".write": "auth != null && auth.uid == $uid"
+      }
+    },
+    "evidenceIndex": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
+        ".write": "auth != null && auth.uid == $uid"
+      }
+    }
+  }
+}

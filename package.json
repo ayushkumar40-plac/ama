@@ -8,9 +8,9 @@
     "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "emulators": "firebase emulators:start --only auth,firestore,storage",
+    "emulators": "firebase emulators:start --only auth,firestore,database,storage",
     "firebase:login": "firebase login",
-    "deploy:rules": "firebase deploy --only firestore:rules,storage"
+    "deploy:rules": "firebase deploy --only firestore:rules,storage,database"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.2",
