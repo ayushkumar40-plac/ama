@@ -73,10 +73,89 @@ export function SafetyProvider({ children }) {
   const [voiceTriggerEnabled, setVoiceTriggerEnabled] = useState(false);
   const [voiceTriggerStatus, setVoiceTriggerStatus] = useState('');
   const [voiceTranscript, setVoiceTranscript] = useState('');
+  const [voiceRecordingActive, setVoiceRecordingActive] = useState(false);
+  const [voiceRecordingStatus, setVoiceRecordingStatus] = useState('');
+  const [voiceRecordingUrl, setVoiceRecordingUrl] = useState('');
+  const [voiceRecordingType, setVoiceRecordingType] = useState('audio/webm');
   const [shakeTriggerEnabled, setShakeTriggerEnabled] = useState(false);
   const [shakeTriggerStatus, setShakeTriggerStatus] = useState('');
   const voiceRecognitionRef = useRef(null);
   const voiceTriggerEnabledRef = useRef(false);
+  const voiceMediaStreamRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const recordingChunksRef = useRef([]);
+  const recordingUrlRef = useRef('');
+  const mediaRequestIdRef = useRef(0);
+  const mediaRequestPendingRef = useRef(false);
+  const recognitionRestartTimerRef = useRef(null);
+
+  const startSituationRecording = useCallback(() => {
+    if (mediaRecorderRef.current?.state === 'recording') return true;
+
+    const stream = voiceMediaStreamRef.current;
+    if (!stream) {
+      setVoiceRecordingStatus(mediaRequestPendingRef.current
+        ? 'Preparing microphone for the situation recording...'
+        : 'Audio recording is unavailable. Allow microphone access before enabling voice SOS.');
+      return false;
+    }
+
+    if (!window.MediaRecorder) {
+      setVoiceRecordingStatus('Audio recording is not supported by this browser.');
+      return false;
+    }
+
+    try {
+      const supportedType = ['audio/webm;codecs=opus', 'audio/mp4']
+        .find((type) => window.MediaRecorder.isTypeSupported?.(type));
+      const recorder = supportedType
+        ? new window.MediaRecorder(stream, { mimeType: supportedType })
+        : new window.MediaRecorder(stream);
+
+      if (recordingUrlRef.current) URL.revokeObjectURL(recordingUrlRef.current);
+      recordingUrlRef.current = '';
+      setVoiceRecordingUrl('');
+      recordingChunksRef.current = [];
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) recordingChunksRef.current.push(event.data);
+      };
+      recorder.onstop = () => {
+        const recording = new Blob(recordingChunksRef.current, { type: recorder.mimeType || 'audio/webm' });
+        recordingChunksRef.current = [];
+        if (recording.size > 0) {
+          if (recordingUrlRef.current) URL.revokeObjectURL(recordingUrlRef.current);
+          const recordingUrl = URL.createObjectURL(recording);
+          recordingUrlRef.current = recordingUrl;
+          setVoiceRecordingUrl(recordingUrl);
+          setVoiceRecordingType(recording.type || recorder.mimeType || 'audio/webm');
+          setVoiceRecordingStatus('Situation recording is ready to play or download.');
+        } else {
+          setVoiceRecordingStatus('No audio was captured.');
+        }
+        setVoiceRecordingActive(false);
+        mediaRecorderRef.current = null;
+        voiceMediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+        voiceMediaStreamRef.current = null;
+      };
+      recorder.start(1000);
+      mediaRecorderRef.current = recorder;
+      setVoiceRecordingActive(true);
+      setVoiceRecordingStatus('Recording situation audio until the SOS alert is stopped.');
+      return true;
+    } catch {
+      setVoiceRecordingStatus('Could not start the situation recording. Check microphone access and try again.');
+      return false;
+    }
+  }, []);
+
+  const stopSituationRecording = useCallback(() => {
+    if (mediaRecorderRef.current?.state === 'recording') {
+      mediaRecorderRef.current.stop();
+      return;
+    }
+    voiceMediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+    voiceMediaStreamRef.current = null;
+  }, []);
 
   // Stealth Disguise Mode (functional calculator disguise)
   const [stealthMode, setStealthMode] = useState(false);
@@ -217,20 +296,25 @@ export function SafetyProvider({ children }) {
   });
 
   // Handle SOS toggle with audio siren
-  const triggerSOS = useCallback(() => {
+  const triggerSOS = useCallback((source = 'manual') => {
     if (sosActiveRef.current) return;
     sosActiveRef.current = true;
-      if (voiceTriggerEnabledRef.current) setVoiceTriggerStatus('Voice detection stopped after SOS activation.');
+    if (voiceTriggerEnabledRef.current) {
+      setVoiceTriggerStatus(source === 'voice'
+        ? 'Wake phrase detected. Situation recording continues until SOS is stopped.'
+        : 'Voice detection paused during SOS. Situation recording continues until SOS is stopped.');
+    }
     if (shakeTriggerEnabled) setShakeTriggerStatus('Shake detection stopped after SOS activation.');
     voiceTriggerEnabledRef.current = false;
+    window.clearTimeout(recognitionRestartTimerRef.current);
     if (voiceRecognitionRef.current) {
-      voiceRecognitionRef.current.onend = null;
       try { voiceRecognitionRef.current.stop(); } catch {}
       voiceRecognitionRef.current = null;
     }
     setVoiceTriggerEnabled(false);
     setShakeTriggerEnabled(false);
     setSosActive(true);
+    startSituationRecording();
     startAudioSiren();
     // Simulate fetching precise GPS coords
     if ("geolocation" in navigator) {
@@ -245,12 +329,13 @@ export function SafetyProvider({ children }) {
         () => {}
       );
     }
-  }, [shakeTriggerEnabled]);
+  }, [shakeTriggerEnabled, startSituationRecording]);
 
   const cancelSOS = () => {
     sosActiveRef.current = false;
     setSosActive(false);
     stopAudioSiren();
+    stopSituationRecording();
   };
 
   const startVoiceTrigger = () => {
@@ -275,40 +360,75 @@ export function SafetyProvider({ children }) {
 
       setVoiceTranscript(transcript.trim());
          if (/\b(help|emergency|save me)\b/i.test(transcript)) {
-        setVoiceTriggerStatus('Distress phrase detected. SOS is active.');
-        triggerSOS();
+        triggerSOS('voice');
       }
     };
     recognition.onerror = (event) => {
       if (event.error === 'no-speech' || event.error === 'aborted') return;
       voiceTriggerEnabledRef.current = false;
+      window.clearTimeout(recognitionRestartTimerRef.current);
       voiceRecognitionRef.current = null;
       setVoiceTriggerEnabled(false);
       setVoiceTriggerStatus(event.error === 'not-allowed'
         ? 'Microphone access was denied. Allow it in your browser settings to use voice activation.'
         : 'Voice activation stopped. Tap the microphone to try again.');
+      if (!sosActiveRef.current) {
+        mediaRequestIdRef.current += 1;
+        mediaRequestPendingRef.current = false;
+        stopSituationRecording();
+      }
     };
     recognition.onend = () => {
       if (voiceTriggerEnabledRef.current) {
-        window.setTimeout(() => {
-          if (voiceTriggerEnabledRef.current) {
-            try { recognition.start(); } catch {}
+        const restart = () => {
+          if (!voiceTriggerEnabledRef.current || voiceRecognitionRef.current !== recognition) return;
+          try {
+            recognition.start();
+          } catch {
+            recognitionRestartTimerRef.current = window.setTimeout(restart, 350);
           }
-        }, 500);
+        };
+        window.clearTimeout(recognitionRestartTimerRef.current);
+        recognitionRestartTimerRef.current = window.setTimeout(restart, 250);
       }
     };
 
     voiceRecognitionRef.current = recognition;
     voiceTriggerEnabledRef.current = true;
     setVoiceTranscript('');
-    setVoiceTriggerEnabled(true);
-       setVoiceTriggerStatus('Listening for “help”, “emergency”, or “save me”.');
+    const mediaRequestId = ++mediaRequestIdRef.current;
+    mediaRequestPendingRef.current = true;
+    setVoiceRecordingStatus('Microphone access is ready for a situation recording.');
     try {
       recognition.start();
+      setVoiceTriggerEnabled(true);
+      setVoiceTriggerStatus('Listening continuously for “help”, “emergency”, or “save me”.');
+      if (!navigator.mediaDevices?.getUserMedia) {
+        mediaRequestPendingRef.current = false;
+        setVoiceRecordingStatus('Audio recording requires microphone access from a secure connection.');
+      } else {
+        navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+          if (mediaRequestId !== mediaRequestIdRef.current || (!voiceTriggerEnabledRef.current && !sosActiveRef.current)) {
+            mediaRequestPendingRef.current = false;
+            stream.getTracks().forEach((track) => track.stop());
+            return;
+          }
+          mediaRequestPendingRef.current = false;
+          voiceMediaStreamRef.current = stream;
+          if (sosActiveRef.current) startSituationRecording();
+        }).catch(() => {
+          if (mediaRequestId === mediaRequestIdRef.current) {
+            mediaRequestPendingRef.current = false;
+            setVoiceRecordingStatus('Recording permission was denied; voice alerts can still work.');
+          }
+        });
+      }
       return true;
     } catch {
       voiceRecognitionRef.current = null;
       voiceTriggerEnabledRef.current = false;
+      mediaRequestIdRef.current += 1;
+      mediaRequestPendingRef.current = false;
       setVoiceTriggerEnabled(false);
       setVoiceTriggerStatus('Could not start voice activation. Check microphone access and try again.');
       return false;
@@ -317,13 +437,16 @@ export function SafetyProvider({ children }) {
 
   const stopVoiceTrigger = () => {
     voiceTriggerEnabledRef.current = false;
+    mediaRequestIdRef.current += 1;
+    mediaRequestPendingRef.current = false;
+    window.clearTimeout(recognitionRestartTimerRef.current);
     if (voiceRecognitionRef.current) {
-      voiceRecognitionRef.current.onend = null;
       try { voiceRecognitionRef.current.stop(); } catch {}
       voiceRecognitionRef.current = null;
     }
     setVoiceTriggerEnabled(false);
     setVoiceTriggerStatus('Voice activation is off.');
+    stopSituationRecording();
   };
 
   const enableShakeTrigger = async () => {
@@ -385,9 +508,16 @@ export function SafetyProvider({ children }) {
 
   useEffect(() => () => {
     voiceTriggerEnabledRef.current = false;
+    window.clearTimeout(recognitionRestartTimerRef.current);
     if (voiceRecognitionRef.current) {
       try { voiceRecognitionRef.current.stop(); } catch {}
     }
+    if (mediaRecorderRef.current?.state === 'recording') {
+      mediaRecorderRef.current.onstop = null;
+      try { mediaRecorderRef.current.stop(); } catch {}
+    }
+    voiceMediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+    if (recordingUrlRef.current) URL.revokeObjectURL(recordingUrlRef.current);
     stopAudioSiren();
   }, []);
 
@@ -453,6 +583,11 @@ export function SafetyProvider({ children }) {
         voiceTriggerEnabled,
         voiceTriggerStatus,
         voiceTranscript,
+        voiceRecordingActive,
+        voiceRecordingStatus,
+        voiceRecordingUrl,
+        voiceRecordingType,
+        stopSituationRecording,
         startVoiceTrigger,
         stopVoiceTrigger,
         shakeTriggerEnabled,

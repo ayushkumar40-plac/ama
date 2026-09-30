@@ -3,7 +3,16 @@ import { useSafety } from '../context/SafetyContext';
 import { ShieldAlert, PhoneCall, Share2, VolumeX, AlertOctagon, CheckCircle2 } from 'lucide-react';
 
 export default function EmergencyModal() {
-  const { sosActive, cancelSOS, currentCoords } = useSafety();
+  const {
+    sosActive,
+    cancelSOS,
+    currentCoords,
+    voiceRecordingActive,
+    voiceRecordingStatus,
+    voiceRecordingUrl,
+    voiceRecordingType,
+    stopSituationRecording
+  } = useSafety();
   const [countdown, setCountdown] = useState(10);
   const [copied, setCopied] = useState(false);
 
@@ -79,8 +88,28 @@ export default function EmergencyModal() {
         </h2>
 
         <p style={{ color: '#fca5a5', fontSize: '0.95rem', marginBottom: '1.5rem', lineHeight: '1.4' }}>
-          Audio siren is sounding. Live GPS location is locked and ready to broadcast to emergency responders and your trusted circle.
+          Audio siren is sounding. Live GPS location is ready to share with emergency responders and your trusted circle.
         </p>
+
+        {voiceRecordingActive && (
+          <div role="status" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', color: '#fecaca', marginBottom: '1rem', fontSize: '0.9rem' }}>
+            <span>Recording situation audio. Stop SOS to finalize the recording.</span>
+            <button onClick={stopSituationRecording} className="btn-secondary" style={{ flexShrink: 0, padding: '0.45rem 0.7rem', fontSize: '0.8rem' }}>
+              Stop recording
+            </button>
+          </div>
+        )}
+        {!voiceRecordingActive && voiceRecordingUrl && (
+          <div style={{ display: 'grid', gap: '0.5rem', marginBottom: '1rem' }}>
+            <audio controls src={voiceRecordingUrl} style={{ width: '100%' }} />
+            <a href={voiceRecordingUrl} download={`sos-situation-recording.${voiceRecordingType.includes('mp4') ? 'mp4' : 'webm'}`} style={{ color: '#fecaca', fontSize: '0.85rem' }}>
+              Download situation recording
+            </a>
+          </div>
+        )}
+        {!voiceRecordingActive && voiceRecordingStatus && !voiceRecordingUrl && (
+          <p role="status" style={{ color: '#fecaca', marginBottom: '1rem', fontSize: '0.85rem' }}>{voiceRecordingStatus}</p>
+        )}
 
         {/* GPS Box */}
         <div style={{
@@ -110,6 +139,14 @@ export default function EmergencyModal() {
             style={{ width: '100%', padding: '1rem', fontSize: '1.1rem', textDecoration: 'none' }}
           >
             <PhoneCall size={20} /> CALL 112 (POLICE & RESCUE)
+          </a>
+
+          <a
+            href="tel:1091"
+            className="btn-secondary"
+            style={{ width: '100%', padding: '0.85rem', fontSize: '0.95rem', textDecoration: 'none' }}
+          >
+            <PhoneCall size={18} /> CALL WOMEN HELPLINE 1091
           </a>
 
           <button

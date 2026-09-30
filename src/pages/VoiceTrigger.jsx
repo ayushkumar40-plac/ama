@@ -11,6 +11,10 @@ export default function VoiceTrigger() {
     voiceTriggerEnabled,
     voiceTriggerStatus,
     voiceTranscript,
+    voiceRecordingActive,
+    voiceRecordingStatus,
+    voiceRecordingUrl,
+    voiceRecordingType,
     startVoiceTrigger,
     stopVoiceTrigger,
     shakeTriggerEnabled,
@@ -20,7 +24,7 @@ export default function VoiceTrigger() {
   } = useSafety();
 
   const toggleVoiceTrigger = () => {
-    if (voiceTriggerEnabled) stopVoiceTrigger();
+    if (voiceTriggerEnabled || voiceRecordingActive) stopVoiceTrigger();
     else startVoiceTrigger();
   };
 
@@ -62,15 +66,24 @@ export default function VoiceTrigger() {
                   <h3 style={{ fontSize: '1rem', marginBottom: '0.25rem' }}>Voice phrase</h3>
                    <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>“Help”, “emergency”, or “save me”</p>
                 </div>
-                <button onClick={toggleVoiceTrigger} className={voiceTriggerEnabled ? 'btn-danger' : 'btn-secondary'} style={{ flexShrink: 0 }}>
-                  {voiceTriggerEnabled ? <MicOff size={17} /> : <Mic size={17} />}
-                  {voiceTriggerEnabled ? 'Turn off' : 'Turn on'}
+                <button onClick={toggleVoiceTrigger} className={voiceTriggerEnabled || voiceRecordingActive ? 'btn-danger' : 'btn-secondary'} style={{ flexShrink: 0 }}>
+                  {voiceTriggerEnabled || voiceRecordingActive ? <MicOff size={17} /> : <Mic size={17} />}
+                  {voiceRecordingActive ? 'Stop recording' : voiceTriggerEnabled ? 'Turn off' : 'Turn on'}
                 </button>
               </div>
               <p style={{ color: 'var(--text-dim)', fontSize: '0.8rem', marginTop: '0.5rem' }}>
                 {voiceTriggerStatus || 'Microphone access is requested when you turn this on.'}
               </p>
+              {voiceRecordingStatus && <p style={{ color: voiceRecordingActive ? 'var(--primary-light)' : 'var(--text-dim)', fontSize: '0.8rem', marginTop: '0.35rem' }}>{voiceRecordingStatus}</p>}
               {voiceTranscript && <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', marginTop: '0.35rem' }}>Heard: “{voiceTranscript}”</p>}
+              {voiceRecordingUrl && !voiceRecordingActive && (
+                <div style={{ display: 'grid', gap: '0.5rem', marginTop: '0.75rem' }}>
+                  <audio controls src={voiceRecordingUrl} style={{ width: '100%' }} />
+                  <a href={voiceRecordingUrl} download={`sos-situation-recording.${voiceRecordingType.includes('mp4') ? 'mp4' : 'webm'}`} style={{ color: 'var(--primary-light)', fontSize: '0.85rem', textAlign: 'right' }}>
+                    Download situation recording
+                  </a>
+                </div>
+              )}
             </div>
 
             <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '1rem' }}>
