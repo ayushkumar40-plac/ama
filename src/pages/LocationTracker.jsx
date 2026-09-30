@@ -1,108 +1,118 @@
-import React, { useState, useEffect } from 'react';
-import { MapPin, Navigation, ArrowLeft, Users, ShieldCheck } from 'lucide-react';
+import React, { useState } from 'react';
+import { MapPin, Navigation, ArrowLeft, Users, ShieldCheck, Share2, Copy, CheckCircle2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useSafety } from '../context/SafetyContext';
 
 export default function LocationTracker() {
   const navigate = useNavigate();
-  const [location, setLocation] = useState(null);
+  const { currentCoords } = useSafety();
   const [tracking, setTracking] = useState(false);
-  const [error, setError] = useState(null);
+  const [copied, setCopied] = useState(false);
 
   const startTracking = () => {
     setTracking(true);
-    if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setLocation({
-            lat: position.coords.latitude.toFixed(6),
-            lng: position.coords.longitude.toFixed(6)
-          });
-        },
-        (err) => {
-          setError(err.message);
-          // Mock location if denied or error
-          setLocation({ lat: "37.774929", lng: "-122.419418" });
-        }
-      );
-    } else {
-      setError("Geolocation not supported.");
-      setLocation({ lat: "37.774929", lng: "-122.419418" });
-    }
   };
 
   const stopTracking = () => {
     setTracking(false);
-    setLocation(null);
+  };
+
+  const copyCoordLink = () => {
+    navigator.clipboard.writeText(`https://maps.google.com/?q=${currentCoords.lat},${currentCoords.lng}`);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
-    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', padding: '2rem' }}>
+    <div style={{ minHeight: 'calc(100vh - 80px)', display: 'flex', flexDirection: 'column', padding: '1.5rem' }}>
       <button 
         onClick={() => navigate('/')}
-        style={{ width: 'fit-content', background: 'transparent', border: 'none', color: 'var(--text-main)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+        className="btn-secondary"
+        style={{ width: 'fit-content', padding: '0.4rem 0.8rem', fontSize: '0.85rem', marginBottom: '1.5rem' }}
       >
-        <ArrowLeft size={24} /> Back
+        <ArrowLeft size={16} /> Back to Dashboard
       </button>
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
         <motion.div 
-          initial={{ y: 20, opacity: 0 }}
+          initial={{ y: 15, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           className="glass-panel"
-          style={{ padding: '3rem', maxWidth: '600px', width: '100%', textAlign: 'center' }}
+          style={{ padding: '2.5rem 2rem', maxWidth: '600px', width: '100%', textAlign: 'center' }}
         >
-          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.5rem' }}>
-            <div style={{ background: 'rgba(99, 102, 241, 0.2)', padding: '1rem', borderRadius: '50%' }}>
-              <Navigation size={48} color="var(--primary-color)" />
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '1.25rem' }}>
+            <div style={{
+              background: 'rgba(99, 102, 241, 0.15)',
+              width: '70px',
+              height: '70px',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              border: '1px solid rgba(99, 102, 241, 0.3)'
+            }}>
+              <Navigation size={36} color="#818cf8" />
             </div>
           </div>
           
-          <h2 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '1rem' }}>Live Location Tracking</h2>
-          <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>
-            Share your real-time coordinates securely with verified volunteers and trusted contacts.
+          <h2 style={{ fontSize: '1.85rem', fontWeight: '800', marginBottom: '0.5rem' }}>Satellite Location Radar</h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.92rem', marginBottom: '1.75rem', lineHeight: '1.5' }}>
+            Share an encrypted, live-updating GPS beacon with your emergency circle and verified volunteers along your route.
           </p>
 
           {!tracking ? (
-            <button onClick={startTracking} className="btn-primary" style={{ fontSize: '1.1rem', padding: '1rem 2rem' }}>
-              Start Live Tracking
+            <button onClick={startTracking} className="btn-primary" style={{ fontSize: '1rem', padding: '0.85rem 2rem' }}>
+              Activate Precision GPS Broadcast
             </button>
           ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', alignItems: 'center' }}>
-              
-              <div style={{ background: 'rgba(0,0,0,0.3)', padding: '1.5rem', borderRadius: '12px', width: '100%', border: '1px solid rgba(255,255,255,0.1)' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', alignItems: 'center' }}>
+              <div style={{ background: 'rgba(0,0,0,0.4)', padding: '1.25rem', borderRadius: '12px', width: '100%', border: '1px solid rgba(255,255,255,0.08)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem', color: '#818cf8' }}>
-                  <MapPin size={20} /> <span style={{ fontWeight: 'bold' }}>Current Coordinates</span>
+                  <MapPin size={18} /> <span style={{ fontWeight: '700' }}>Active Geolocation Fix</span>
                 </div>
-                {location ? (
-                  <p style={{ fontSize: '1.25rem', fontFamily: 'monospace' }}>Lat: {location.lat} <br/> Lng: {location.lng}</p>
-                ) : (
-                  <p>Acquiring GPS signal...</p>
-                )}
+                <p style={{ fontSize: '1.15rem', fontFamily: 'var(--font-mono)', color: '#fff' }}>
+                  Lat: {currentCoords.lat.toFixed(5)} <br/>
+                  Lng: {currentCoords.lng.toFixed(5)}
+                </p>
+                <div style={{ color: '#94a3b8', fontSize: '0.82rem', marginTop: '6px' }}>{currentCoords.address}</div>
               </div>
 
-              <div style={{ display: 'flex', gap: '2rem', marginTop: '1rem' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
-                  <div style={{ background: 'rgba(34, 197, 94, 0.2)', padding: '0.75rem', borderRadius: '50%' }}>
-                    <ShieldCheck size={24} color="#22c55e" />
+              <div style={{ display: 'flex', gap: '2rem', justifyContent: 'center' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.35rem' }}>
+                  <div style={{ background: 'rgba(34, 197, 94, 0.2)', padding: '0.65rem', borderRadius: '50%' }}>
+                    <ShieldCheck size={22} color="#22c55e" />
                   </div>
-                  <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>Secure Link Active</span>
+                  <span style={{ fontSize: '0.8rem', color: '#34d399' }}>Encrypted Link Active</span>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
-                  <div style={{ background: 'rgba(59, 130, 246, 0.2)', padding: '0.75rem', borderRadius: '50%' }}>
-                    <Users size={24} color="#3b82f6" />
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.35rem' }}>
+                  <div style={{ background: 'rgba(59, 130, 246, 0.2)', padding: '0.65rem', borderRadius: '50%' }}>
+                    <Users size={22} color="#3b82f6" />
                   </div>
-                  <span style={{ fontSize: '0.9rem', color: 'var(--text-muted)' }}>3 Contacts Viewing</span>
+                  <span style={{ fontSize: '0.8rem', color: '#60a5fa' }}>3 Guardians Monitoring</span>
                 </div>
               </div>
 
-              <button onClick={stopTracking} className="btn-secondary" style={{ marginTop: '1rem', borderColor: '#ef4444', color: '#ef4444' }}>
-                Stop Tracking
-              </button>
+              <div style={{ display: 'flex', gap: '0.5rem', width: '100%' }}>
+                <button
+                  onClick={copyCoordLink}
+                  className="btn-secondary"
+                  style={{ flex: 1, padding: '0.75rem', fontSize: '0.85rem' }}
+                >
+                  {copied ? <CheckCircle2 size={16} color="#34d399" /> : <Copy size={16} />}
+                  <span>{copied ? 'Copied Link' : 'Copy GPS Link'}</span>
+                </button>
+
+                <button
+                  onClick={stopTracking}
+                  className="btn-secondary"
+                  style={{ padding: '0.75rem 1rem', borderColor: '#ef4444', color: '#ef4444', fontSize: '0.85rem' }}
+                >
+                  Stop Radar
+                </button>
+              </div>
             </div>
           )}
-
-          {error && tracking && <p style={{ color: '#ef4444', marginTop: '1rem', fontSize: '0.9rem' }}>{error} (Using Mock Data)</p>}
         </motion.div>
       </div>
     </div>

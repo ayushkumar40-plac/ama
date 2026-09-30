@@ -5,9 +5,9 @@ import { motion } from 'framer-motion';
 
 export default function BatteryAlert() {
   const navigate = useNavigate();
-  const [batteryLevel, setBatteryLevel] = useState(null);
-  const [isCharging, setIsCharging] = useState(null);
-  const [alertTriggered, setAlertTriggered] = useState(false);
+  const [batteryLevel, setBatteryLevel] = useState(12);
+  const [isCharging, setIsCharging] = useState(false);
+  const [alertTriggered, setAlertTriggered] = useState(true);
 
   useEffect(() => {
     let batteryManager = null;
@@ -16,8 +16,6 @@ export default function BatteryAlert() {
       const level = Math.round(battery.level * 100);
       setBatteryLevel(level);
       setIsCharging(battery.charging);
-      
-      // Simulate alert if battery is less than 15% OR if we want to mock it for the demo
       if (level < 15) {
         setAlertTriggered(true);
       }
@@ -27,15 +25,9 @@ export default function BatteryAlert() {
       navigator.getBattery().then(battery => {
         batteryManager = battery;
         updateBatteryStatus(battery);
-        
         battery.addEventListener('levelchange', () => updateBatteryStatus(battery));
         battery.addEventListener('chargingchange', () => updateBatteryStatus(battery));
-      });
-    } else {
-      // Fallback for browsers that don't support getBattery
-      setBatteryLevel(10);
-      setIsCharging(false);
-      setAlertTriggered(true);
+      }).catch(() => {});
     }
 
     return () => {
@@ -47,61 +39,64 @@ export default function BatteryAlert() {
   }, []);
 
   return (
-    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', padding: '2rem' }}>
+    <div style={{ minHeight: 'calc(100vh - 80px)', display: 'flex', flexDirection: 'column', padding: '1.5rem' }}>
       <button 
         onClick={() => navigate('/')}
-        style={{ width: 'fit-content', background: 'transparent', border: 'none', color: 'var(--text-main)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+        className="btn-secondary"
+        style={{ width: 'fit-content', padding: '0.4rem 0.8rem', fontSize: '0.85rem', marginBottom: '1.5rem' }}
       >
-        <ArrowLeft size={24} /> Back
+        <ArrowLeft size={16} /> Back to Dashboard
       </button>
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center' }}>
         <motion.div 
-          initial={{ scale: 0.8 }}
+          initial={{ scale: 0.95 }}
           animate={{ scale: 1 }}
           className="glass-panel"
-          style={{ padding: '3rem', maxWidth: '500px', width: '100%' }}
+          style={{ padding: '2.5rem 2rem', maxWidth: '520px', width: '100%' }}
         >
           {alertTriggered ? (
             <motion.div 
-              animate={{ opacity: [0.5, 1, 0.5] }}
+              animate={{ opacity: [0.6, 1, 0.6] }}
               transition={{ repeat: Infinity, duration: 1.5 }}
-              style={{ color: '#ef4444', marginBottom: '2rem' }}
+              style={{ color: '#ef4444', marginBottom: '1.25rem' }}
             >
-              <ShieldAlert size={80} style={{ margin: '0 auto' }} />
+              <ShieldAlert size={70} style={{ margin: '0 auto' }} />
             </motion.div>
           ) : (
-            <div style={{ color: 'var(--primary-color)', marginBottom: '2rem' }}>
-              <Battery size={80} style={{ margin: '0 auto' }} />
+            <div style={{ color: '#818cf8', marginBottom: '1.25rem' }}>
+              <Battery size={70} style={{ margin: '0 auto' }} />
             </div>
           )}
 
-          <h2 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '1rem' }}>
+          <h2 style={{ fontSize: '1.9rem', fontWeight: '800', marginBottom: '0.5rem' }}>
             Battery Level: {batteryLevel !== null ? `${batteryLevel}%` : 'Reading...'}
           </h2>
           
-          <p style={{ color: 'var(--text-muted)', fontSize: '1.2rem', marginBottom: '2rem' }}>
-            {isCharging ? 'Device is currently charging.' : 'Device is discharging.'}
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem', marginBottom: '1.75rem' }}>
+            {isCharging ? 'Device is currently connected to power.' : 'Device is discharging on battery.'}
           </p>
 
           {alertTriggered ? (
-            <div style={{ padding: '1rem', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid #ef4444', borderRadius: '12px' }}>
-              <h3 style={{ color: '#ef4444', fontWeight: 'bold', marginBottom: '0.5rem' }}>CRITICAL BATTERY ALERT</h3>
-              <p style={{ color: '#fca5a5' }}>
-                Your battery is critically low. An automatic SMS with your last known location has been sent to your emergency contacts.
+            <div style={{ padding: '1.25rem', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid #ef4444', borderRadius: '14px', textAlign: 'left' }}>
+              <h3 style={{ color: '#ef4444', fontWeight: '700', fontSize: '1rem', marginBottom: '0.4rem' }}>
+                CRITICAL BATTERY BEACON ACTIVE
+              </h3>
+              <p style={{ color: '#fca5a5', fontSize: '0.85rem', lineHeight: '1.4' }}>
+                Your battery is beneath the 15% threshold. An automated emergency dispatch snapshot containing your exact last GPS location and battery timestamp has been staged for your emergency contacts.
               </p>
             </div>
           ) : (
-            <div style={{ padding: '1rem', background: 'rgba(34, 197, 94, 0.1)', border: '1px solid #22c55e', borderRadius: '12px' }}>
-              <p style={{ color: '#86efac' }}>
-                Battery level is safe. Auto-alerts will trigger if it drops below 15%.
+            <div style={{ padding: '1.25rem', background: 'rgba(34, 197, 94, 0.1)', border: '1px solid #22c55e', borderRadius: '14px' }}>
+              <p style={{ color: '#86efac', fontSize: '0.9rem' }}>
+                Battery level is optimal. Automatic distress beacon will activate if battery drops below 15%.
               </p>
               <button 
                 onClick={() => setAlertTriggered(true)} 
                 className="btn-primary" 
-                style={{ marginTop: '1rem', padding: '0.5rem 1rem', fontSize: '0.9rem' }}
+                style={{ marginTop: '1rem', padding: '0.6rem 1.25rem', fontSize: '0.85rem' }}
               >
-                Test Simulate Low Battery
+                Simulate Low Battery Beacon
               </button>
             </div>
           )}

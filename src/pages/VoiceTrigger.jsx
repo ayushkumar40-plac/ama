@@ -1,17 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, MicOff, AlertCircle, ArrowLeft } from 'lucide-react';
+import { Mic, MicOff, AlertCircle, ArrowLeft, Volume2, ShieldAlert } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useSafety } from '../context/SafetyContext';
 
 export default function VoiceTrigger() {
   const navigate = useNavigate();
+  const { triggerSOS } = useSafety();
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [alertTriggered, setAlertTriggered] = useState(false);
   const recognitionRef = useRef(null);
 
   useEffect(() => {
-    // Setup Speech Recognition
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRecognition) {
       const recognition = new SpeechRecognition();
@@ -25,21 +26,20 @@ export default function VoiceTrigger() {
         }
         setTranscript(currentTranscript);
         
-        // Check for trigger word (e.g., "help", "emergency", "guardian")
-        const lowerCaseTranscript = currentTranscript.toLowerCase();
-        if (lowerCaseTranscript.includes('help') || lowerCaseTranscript.includes('emergency') || lowerCaseTranscript.includes('guardian')) {
+        const lowerCase = currentTranscript.toLowerCase();
+        if (lowerCase.includes('help') || lowerCase.includes('emergency') || lowerCase.includes('save me') || lowerCase.includes('guardian')) {
           setAlertTriggered(true);
+          triggerSOS();
         }
       };
 
-      recognition.onerror = (event) => {
-        console.error("Speech recognition error", event.error);
+      recognition.onerror = () => {
         setIsListening(false);
       };
 
       recognition.onend = () => {
         if (isListening) {
-          recognition.start(); // Restart if it stops automatically
+          try { recognition.start(); } catch (_) {}
         }
       };
 
@@ -48,10 +48,10 @@ export default function VoiceTrigger() {
 
     return () => {
       if (recognitionRef.current) {
-        recognitionRef.current.stop();
+        try { recognitionRef.current.stop(); } catch (_) {}
       }
     };
-  }, [isListening]);
+  }, [isListening, triggerSOS]);
 
   const toggleListening = () => {
     if (isListening) {
@@ -60,33 +60,48 @@ export default function VoiceTrigger() {
     } else {
       setTranscript('');
       setAlertTriggered(false);
-      recognitionRef.current?.start();
-      setIsListening(true);
+      try {
+        recognitionRef.current?.start();
+        setIsListening(true);
+      } catch (_) {
+        setIsListening(true);
+      }
     }
   };
 
+  const simulateVoiceSOS = () => {
+    setTranscript('Simulated Codeword: "Emergency Help Required!"');
+    setAlertTriggered(true);
+    triggerSOS();
+  };
+
   return (
-    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', padding: '2rem' }}>
+    <div style={{ minHeight: 'calc(100vh - 80px)', display: 'flex', flexDirection: 'column', padding: '1.5rem' }}>
       <button 
         onClick={() => {
           if (recognitionRef.current) recognitionRef.current.stop();
           navigate('/');
         }}
-        style={{ width: 'fit-content', background: 'transparent', border: 'none', color: 'var(--text-main)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+        className="btn-secondary"
+        style={{ width: 'fit-content', padding: '0.4rem 0.8rem', fontSize: '0.85rem', marginBottom: '1.5rem' }}
       >
-        <ArrowLeft size={24} /> Back
+        <ArrowLeft size={16} /> Back to Dashboard
       </button>
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
         <motion.div 
-          initial={{ scale: 0.9, opacity: 0 }}
+          initial={{ scale: 0.95, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           className="glass-panel"
-          style={{ padding: '3rem', maxWidth: '600px', width: '100%', textAlign: 'center' }}
+          style={{ padding: '2.5rem 2rem', maxWidth: '600px', width: '100%', textAlign: 'center' }}
         >
-          <h2 style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '1rem' }}>AI Voice Trigger</h2>
-          <p style={{ color: 'var(--text-muted)', marginBottom: '2rem' }}>
-            Say <strong>"Help"</strong>, <strong>"Emergency"</strong>, or <strong>"Guardian"</strong> to trigger an SOS.
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', marginBottom: '1rem' }}>
+            <span className="badge badge-purple">HANDS-FREE ACOUSTIC SENSOR</span>
+          </div>
+
+          <h2 style={{ fontSize: '1.9rem', fontWeight: '800', marginBottom: '0.5rem' }}>AI Voice Trigger</h2>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.92rem', marginBottom: '2rem', lineHeight: '1.5' }}>
+            When under duress or unable to touch your phone, speak trigger phrases: <strong style={{ color: '#f472b6' }}>"Help"</strong>, <strong style={{ color: '#f472b6' }}>"Emergency"</strong>, or <strong style={{ color: '#f472b6' }}>"Guardian"</strong>.
           </p>
 
           <button 
@@ -94,40 +109,45 @@ export default function VoiceTrigger() {
             style={{ 
               width: '100px', height: '100px', borderRadius: '50%', 
               backgroundColor: isListening ? 'rgba(239, 68, 68, 0.2)' : 'rgba(99, 102, 241, 0.2)',
-              border: isListening ? '2px solid #ef4444' : '2px solid var(--primary-color)',
-              color: isListening ? '#ef4444' : 'var(--primary-color)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', margin: '0 auto 2rem auto',
+              border: isListening ? '3px solid #ef4444' : '3px solid #6366f1',
+              color: isListening ? '#ef4444' : '#818cf8',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', margin: '0 auto 1.5rem auto',
+              boxShadow: isListening ? '0 0 30px rgba(239, 68, 68, 0.5)' : 'none',
               transition: 'all 0.3s ease'
             }}
           >
             {isListening ? (
-              <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 1 }}>
-                <Mic size={40} />
+              <motion.div animate={{ scale: [1, 1.25, 1] }} transition={{ repeat: Infinity, duration: 1 }}>
+                <Mic size={44} />
               </motion.div>
             ) : (
-              <MicOff size={40} />
+              <MicOff size={44} />
             )}
           </button>
 
-          <div style={{ minHeight: '80px', padding: '1rem', background: 'rgba(0,0,0,0.3)', borderRadius: '8px', marginBottom: '2rem' }}>
-            <p style={{ color: '#fff', fontStyle: 'italic' }}>
-              {transcript || (isListening ? "Listening..." : "Tap the microphone to start.")}
+          <div style={{
+            minHeight: '70px',
+            padding: '1rem',
+            background: 'rgba(0,0,0,0.4)',
+            borderRadius: '12px',
+            marginBottom: '1.5rem',
+            border: '1px solid var(--border-subtle)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
+            <p style={{ color: '#fff', fontStyle: 'italic', fontSize: '0.9rem' }}>
+              {transcript || (isListening ? "Listening actively for trigger keywords..." : "Tap the mic to activate voice listener.")}
             </p>
           </div>
 
-          {alertTriggered && (
-            <motion.div 
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              style={{ padding: '1rem', background: 'rgba(239, 68, 68, 0.2)', border: '1px solid #ef4444', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '1rem', justifyContent: 'center' }}
-            >
-              <AlertCircle color="#ef4444" size={32} />
-              <div style={{ textAlign: 'left' }}>
-                <h3 style={{ color: '#ef4444', fontWeight: 'bold' }}>SOS TRIGGERED!</h3>
-                <p style={{ color: '#fca5a5', fontSize: '0.9rem' }}>Voice keyword detected. Authorities and contacts notified.</p>
-              </div>
-            </motion.div>
-          )}
+          <button
+            onClick={simulateVoiceSOS}
+            className="btn-danger"
+            style={{ width: '100%', padding: '0.85rem', fontSize: '0.95rem' }}
+          >
+            <ShieldAlert size={18} /> Test Simulate Voice Keyword Trigger
+          </button>
         </motion.div>
       </div>
     </div>
